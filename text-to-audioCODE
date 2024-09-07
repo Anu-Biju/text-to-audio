@@ -1,0 +1,85 @@
+import sqlite3
+from gtts import gTTS
+import pyttsx3
+import os
+
+# Set up SQLite database
+conn = sqlite3.connect('text_history.db')
+cursor = conn.cursor()
+
+# Create table if not exists
+cursor.execute('''CREATE TABLE IF NOT EXISTS history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    text TEXT NOT NULL)''')
+conn.commit()
+
+# Function to add text to the database
+def save_to_db(user_text):
+    cursor.execute('INSERT INTO history (text) VALUES (?)', (user_text,))
+    conn.commit()
+
+# Function to retrieve search history
+def show_history():
+    cursor.execute('SELECT * FROM history')
+    rows = cursor.fetchall()
+    for row in rows:
+        print(f"ID: {row[0]}, Text: {row[1]}")
+    return rows
+
+# Function for text-to-speech with gTTS (Google Text-to-Speech)
+def gtts_speak(text, lang='en', slow=False, gender='female'):
+    if gender == 'male':
+        lang = 'en-us'  # Male voice works well in American English
+    tts = gTTS(text=text, lang=lang, slow=slow)
+    tts.save("speech.mp3")
+    os.system("start speech.mp3")  # For Windows; use "afplay" for Mac, "xdg-open" for Linux
+
+# Function for text-to-speech with pyttsx3 (control speed and voice)
+def pyttsx_speak(text, speed=200, voice_gender='female'):
+    engine = pyttsx3.init()
+    voices = engine.getProperty('voices')
+
+    if voice_gender == 'male':
+        engine.setProperty('voice', voices[0].id)  # Set male voice
+    else:
+        engine.setProperty('voice', voices[1].id)  # Set female voice
+
+    engine.setProperty('rate', speed)  # Speed of speech
+    engine.say(text)
+    engine.runAndWait()
+
+# Main function to take user input and control the flow
+def main():
+    while True:
+        print("\n--- Text to Speech App ---")
+        user_text = input("Enter text (or 'exit' to quit): ")
+        
+        if user_text.lower() == 'exit':
+            break
+        
+        # Save the entered text to the database
+        save_to_db(user_text)
+
+        # Choose voice options
+        print("Choose voice options: 1. gTTS (Male/Female), 2. pyttsx3 (speed control)")
+        choice = input("Enter 1 or 2: ")
+        
+        if choice == '1':
+            gender = input("Choose voice gender (male/female): ").lower()
+            speed = input("Do you want slow speed? (yes/no): ").lower()
+            gtts_speak(user_text, gender=gender, slow=(speed == 'yes'))
+        
+        elif choice == '2':
+            gender = input("Choose voice gender (male/female): ").lower()
+            speed = int(input("Enter speech speed (default is 200): "))
+            pyttsx_speak(user_text, speed=speed, voice_gender=gender)
+        
+        # Option to show search history
+        show_history_opt = input("Do you want to view search history? (yes/no): ").lower()
+        if show_history_opt == 'yes':
+            show_history()
+
+    conn.close()
+
+if __name__ == "__main__":
+    main()
